@@ -267,23 +267,23 @@ function QiblaCompass({ bearing, isLoading }: { bearing: number | undefined; isL
         <text x={cx+41} y={cy}      textAnchor="middle" dominantBaseline="middle" fontSize="7.5" fontFamily="Cinzel,serif" fill="hsl(43 40% 38%)">E</text>
         <text x={cx-41} y={cy}      textAnchor="middle" dominantBaseline="middle" fontSize="7.5" fontFamily="Cinzel,serif" fill="hsl(43 40% 38%)">W</text>
 
-        {/* ── Needle — rotated by bearing, drawn BEFORE center so pivot covers the gap ── */}
+        {/* ── Needle — rotated by bearing, drawn after center so it stays visible ── */}
         {bearing !== undefined && !isLoading && (
           <g transform={`rotate(${bearing}, ${cx}, ${cy})`}>
-            {/* White tip — points toward Qibla */}
+            {/* Needle tip */}
             <polygon
-              points={`${cx},${cy - 44}  ${cx - 6},${cy + 4}  ${cx + 6},${cy + 4}`}
-              fill="#ffffff"
-              stroke="#cccccc"
-              strokeWidth="0.5"
+              points={`${cx},${cy - 48}  ${cx - 8},${cy + 8}  ${cx + 8},${cy + 8}`}
+              fill="#f7f2df"
+              stroke="#d7b24c"
+              strokeWidth="1"
               strokeLinejoin="round"
             />
-            {/* Red tail — points away */}
+            {/* Needle tail */}
             <polygon
-              points={`${cx},${cy + 36}  ${cx - 4},${cy + 8}  ${cx + 4},${cy + 8}`}
+              points={`${cx},${cy + 40}  ${cx - 5},${cy + 12}  ${cx + 5},${cy + 12}`}
               fill="#e53935"
-              stroke="#ef5350"
-              strokeWidth="0.5"
+              stroke="#ff7a70"
+              strokeWidth="1"
               strokeLinejoin="round"
             />
           </g>
@@ -296,20 +296,20 @@ function QiblaCompass({ bearing, isLoading }: { bearing: number | undefined; isL
           </circle>
         )}
 
-        {/* Center cap — covers needle base, sits on top */}
-        <circle cx={cx} cy={cy} r="14" fill="hsl(230 30% 10%)" stroke="hsl(43 45% 32%)" strokeWidth="1" />
+        {/* Center cap — sits above the needle base */}
+        <circle cx={cx} cy={cy} r="10" fill="hsl(230 30% 10%)" stroke="hsl(43 45% 32%)" strokeWidth="1" />
 
         {/* Kaaba icon in pure SVG (no foreignObject) */}
         {/* Front face */}
-        <rect x={cx - 7} y={cy - 5} width="12" height="10" fill="hsl(43 65% 44%)" />
+        <rect x={cx - 6} y={cy - 4} width="10" height="8" fill="hsl(43 65% 44%)" />
         {/* Top face */}
-        <polygon points={`${cx-7},${cy-5} ${cx-3},${cy-9} ${cx+9},${cy-9} ${cx+5},${cy-5}`} fill="hsl(43 75% 56%)" />
+        <polygon points={`${cx-6},${cy-4} ${cx-3},${cy-8} ${cx+7},${cy-8} ${cx+4},${cy-4}`} fill="hsl(43 75% 56%)" />
         {/* Right face */}
-        <polygon points={`${cx+5},${cy-5} ${cx+9},${cy-9} ${cx+9},${cy+1} ${cx+5},${cy+5}`} fill="hsl(43 45% 30%)" />
+        <polygon points={`${cx+4},${cy-4} ${cx+7},${cy-8} ${cx+7},${cy+0} ${cx+4},${cy+4}`} fill="hsl(43 45% 30%)" />
         {/* Kiswa gold band */}
-        <rect x={cx - 7} y={cy - 1} width="12" height="2" fill="hsl(43 90% 62%)" />
+        <rect x={cx - 6} y={cy - 1} width="10" height="1.5" fill="hsl(43 90% 62%)" />
         {/* Pivot dot */}
-        <circle cx={cx} cy={cy} r="3" fill="hsl(43 72% 48%)" stroke="hsl(230 30% 7%)" strokeWidth="1" />
+        <circle cx={cx} cy={cy} r="2.5" fill="hsl(43 72% 48%)" stroke="hsl(230 30% 7%)" strokeWidth="1" />
       </svg>
 
       {/* Label */}
