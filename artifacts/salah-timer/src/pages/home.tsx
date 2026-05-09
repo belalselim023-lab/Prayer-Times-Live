@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 interface HijriDate {
@@ -359,6 +359,37 @@ export default function Home() {
   const [selectedCity, setSelectedCity] = useState<City>(CITIES[0]);
   const [cityTime, setCityTime] = useState({ h: 0, m: 0, s: 0, display: "00:00:00" });
   const [nextPrayer, setNextPrayer] = useState<{ name: string; remainingMinutes: number } | null>(null);
+  const [adhanEnabled, setAdhanEnabled] = useState(true);
+  const [adhanPlaying, setAdhanPlaying] = useState(false);
+  const audioRef  = useRef<HTMLAudioElement | null>(null);
+  const playedRef = useRef<Set<string>>(new Set());
+
+  /* Play / stop adhan */
+  const playAdhan = useCallback(() => {
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      const audio = new Audio("https://audio.islamicaudio.net/adhan/adhan.mp3");
+      audio.volume = 0.85;
+      audioRef.current = audio;
+      audio.onplay  = () => setAdhanPlaying(true);
+      audio.onended = () => setAdhanPlaying(false);
+      audio.onerror = () => setAdhanPlaying(false);
+      audio.play().catch(() => setAdhanPlaying(false));
+    } catch {
+      setAdhanPlaying(false);
+    }
+  }, []);
+
+  const stopAdhan = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setAdhanPlaying(false);
+  }, []);
 
   const dateStr = getDateString();
 
@@ -389,7 +420,7 @@ export default function Home() {
     retry: 2,
   });
 
-  /* Live city clock */
+  /* Live city clock + adhan trigger */
   useEffect(() => {
     const tick = () => {
       const ct = getCityTime(selectedCity.timezone);
@@ -397,12 +428,30 @@ export default function Home() {
       if (data?.timings) {
         const np = getNextPrayer(data.timings, ct.h, ct.m);
         setNextPrayer(np);
+
+        /* Fire adhan at second 0 of each prayer minute */
+        if (ct.s === 0 && adhanEnabled) {
+          const nowMins = ct.h * 60 + ct.m;
+          for (const prayerKey of ACTIVE_PRAYERS) {
+            const raw = data.timings[prayerKey];
+            if (!raw) continue;
+            const [ph, pm] = raw.split(":").map(Number);
+            if (nowMins === ph * 60 + pm) {
+              const key = `${selectedCity.id}-${prayerKey}-${getDateString()}`;
+              if (!playedRef.current.has(key)) {
+                playedRef.current.add(key);
+                playAdhan();
+              }
+              break;
+            }
+          }
+        }
       }
     };
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [selectedCity, data]);
+  }, [selectedCity, data, adhanEnabled, playAdhan]);
 
   const hijri = data?.date?.hijri;
   const gregorian = data?.date?.gregorian;
@@ -431,6 +480,88 @@ export default function Home() {
               bearing={qiblaData?.bearing ?? computeQibla(selectedCity.lat, selectedCity.lng)}
               isLoading={false}
             />
+          </div>
+
+          {/* Adhan mute toggle — top right */}
+          <div className="absolute right-0 top-0 flex flex-col items-center gap-1">
+            <button
+              onClick={() => {
+                if (adhanEnabled) {
+                  stopAdhan();
+                  setAdhanEnabled(false);
+                } else {
+                  setAdhanEnabled(true);
+                }
+              }}
+              title={adhanEnabled ? "Mute Adhan" : "Unmute Adhan"}
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: adhanPlaying
+                  ? "radial-gradient(circle, hsl(43 80% 20%) 0%, hsl(230 30% 8%) 100%)"
+                  : "hsl(230 30% 8%)",
+                border: `2px solid ${adhanEnabled ? "hsl(43 72% 48%)" : "hsl(43 25% 28%)"}`,
+                boxShadow: adhanPlaying ? "0 0 14px hsl(43 72% 48% / 0.55)" : "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "box-shadow 0.3s, border-color 0.3s",
+                outline: "none",
+              }}
+            >
+              {adhanEnabled ? (
+                /* Speaker with sound waves */
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <polygon points="3,8 3,16 7,16 13,20 13,4 7,8" fill={adhanPlaying ? "hsl(43 85% 65%)" : "hsl(43 65% 48%)"} />
+                  <path d="M16 8.5 C17.5 9.8 18.3 11.1 18.3 12 C18.3 12.9 17.5 14.2 16 15.5"
+                    stroke={adhanPlaying ? "hsl(43 85% 65%)" : "hsl(43 65% 48%)"}
+                    strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                  <path d="M18.5 6 C21 8 22.3 10 22.3 12 C22.3 14 21 16 18.5 18"
+                    stroke={adhanPlaying ? "hsl(43 85% 65%)" : "hsl(43 50% 40%)"}
+                    strokeWidth="1.5" strokeLinecap="round" fill="none"
+                    strokeOpacity={adhanPlaying ? "1" : "0.6"} />
+                </svg>
+              ) : (
+                /* Speaker muted (cross) */
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <polygon points="3,8 3,16 7,16 13,20 13,4 7,8" fill="hsl(43 30% 35%)" />
+                  <line x1="16" y1="9" x2="22" y2="15" stroke="hsl(43 30% 35%)" strokeWidth="2" strokeLinecap="round" />
+                  <line x1="22" y1="9" x2="16" y2="15" stroke="hsl(43 30% 35%)" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
+            {/* Pulsing "LIVE" dot when adhan is playing */}
+            {adhanPlaying && (
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: "hsl(43 85% 62%)",
+                  display: "inline-block",
+                  animation: "pulse 1s ease-in-out infinite",
+                }} />
+                <span style={{
+                  fontFamily: "Cinzel, serif",
+                  fontSize: "7px",
+                  letterSpacing: "0.25em",
+                  color: "hsl(43 72% 55%)",
+                  textTransform: "uppercase",
+                }}>Adhan</span>
+              </div>
+            )}
+            {!adhanPlaying && (
+              <p style={{
+                fontFamily: "Cinzel, serif",
+                fontSize: "7px",
+                letterSpacing: "0.2em",
+                color: adhanEnabled ? "hsl(43 40% 36%)" : "hsl(43 20% 28%)",
+                textTransform: "uppercase",
+                marginTop: 2,
+              }}>
+                {adhanEnabled ? "Adhan" : "Muted"}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-center gap-3 mb-3">
