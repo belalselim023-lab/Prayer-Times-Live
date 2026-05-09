@@ -371,13 +371,23 @@ export default function Home() {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
-      const audio = new Audio("https://audio.islamicaudio.net/adhan/adhan.mp3");
-      audio.volume = 0.85;
-      audioRef.current = audio;
-      audio.onplay  = () => setAdhanPlaying(true);
-      audio.onended = () => setAdhanPlaying(false);
-      audio.onerror = () => setAdhanPlaying(false);
-      audio.play().catch(() => setAdhanPlaying(false));
+      // Try sources in order — first working one plays
+      const ADHAN_SOURCES = [
+        "https://www.islamcan.com/audio/adhan/azan1.mp3",
+        "https://ia800300.us.archive.org/18/items/adhaan_makkah/adhaan_makkah.mp3",
+        "https://audio.islamicaudio.net/adhan/adhan.mp3",
+      ];
+      const trySource = (index: number) => {
+        if (index >= ADHAN_SOURCES.length) { setAdhanPlaying(false); return; }
+        const audio = new Audio(ADHAN_SOURCES[index]);
+        audio.volume = 0.85;
+        audioRef.current = audio;
+        audio.onplay  = () => setAdhanPlaying(true);
+        audio.onended = () => setAdhanPlaying(false);
+        audio.onerror = () => trySource(index + 1);
+        audio.play().catch(() => trySource(index + 1));
+      };
+      trySource(0);
     } catch {
       setAdhanPlaying(false);
     }
