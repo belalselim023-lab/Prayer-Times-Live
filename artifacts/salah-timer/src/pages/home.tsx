@@ -207,12 +207,16 @@ export default function Home() {
 
   const hijri = data?.date?.hijri;
   const gregorian = data?.date?.gregorian;
+  const isDaytime = cityTime.h >= 6 && cityTime.h < 18;
+  const appBackground = isDaytime
+    ? "linear-gradient(180deg, hsl(43 45% 16%) 0%, hsl(43 35% 13%) 45%, hsl(43 30% 11%) 100%)"
+    : "linear-gradient(180deg, hsl(230 35% 5%) 0%, hsl(230 30% 7%) 40%, hsl(230 30% 8%) 100%)";
 
   return (
     <div
       className="min-h-screen w-full"
       style={{
-        background: "linear-gradient(180deg, hsl(230 35% 5%) 0%, hsl(230 30% 7%) 40%, hsl(230 30% 8%) 100%)",
+        background: appBackground,
       }}
     >
       {/* Decorative top band */}
