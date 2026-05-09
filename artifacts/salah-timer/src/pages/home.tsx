@@ -288,18 +288,6 @@ function QiblaCompass({ bearing, isLoading }: { bearing: number | undefined; isL
         <text x="70" y="40" textAnchor="middle" dominantBaseline="middle" fontSize="6" fontFamily="Cinzel, serif" fill={goldDim}>E</text>
         <text x="10" y="40" textAnchor="middle" dominantBaseline="middle" fontSize="6" fontFamily="Cinzel, serif" fill={goldDim}>W</text>
 
-        {/* Qibla direction arrow — rotated around center by bearing degrees */}
-        {bearing !== undefined && !isLoading && (
-          <g transform={`rotate(${bearing}, 40, 40)`}>
-            {/* Arrow shaft */}
-            <line x1="40" y1="40" x2="40" y2="14" stroke={goldLight} strokeWidth="1.5" strokeLinecap="round" />
-            {/* Arrowhead */}
-            <polygon points="40,9 37,16 43,16" fill={goldLight} />
-            {/* Tail dot */}
-            <circle cx="40" cy="62" r="1.5" fill={goldDim} />
-          </g>
-        )}
-
         {/* Loading spinner arc */}
         {isLoading && (
           <circle cx="40" cy="40" r="14" fill="none" stroke={goldDim} strokeWidth="1" strokeDasharray="22 66" strokeLinecap="round">
@@ -324,6 +312,28 @@ function QiblaCompass({ bearing, isLoading }: { bearing: number | undefined; isL
             <KaabaIcon size={17} />
           </div>
         </foreignObject>
+
+        {/* ── Compass needle — rendered last so it sits on top ── */}
+        {bearing !== undefined && !isLoading && (
+          <g transform={`rotate(${bearing}, 40, 40)`}>
+            {/* Gold tip — points toward Qibla */}
+            <polygon
+              points="40,11 36.5,35 43.5,35"
+              fill={goldLight}
+              stroke="hsl(43 90% 72%)"
+              strokeWidth="0.4"
+              strokeLinejoin="round"
+            />
+            {/* Dimmer tail — points away */}
+            <polygon
+              points="40,62 37.5,46 42.5,46"
+              fill={goldDim}
+              strokeLinejoin="round"
+            />
+            {/* Pivot dot */}
+            <circle cx="40" cy="40" r="3" fill={gold} stroke="hsl(230 30% 8%)" strokeWidth="1" />
+          </g>
+        )}
       </svg>
 
       {/* Label below */}
