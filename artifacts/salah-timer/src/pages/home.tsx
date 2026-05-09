@@ -189,31 +189,14 @@ function StarDecoration() {
   );
 }
 
-/* ── Kaaba SVG icon ─────────────────────────────────────────────────── */
-function KaabaIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Main cube body */}
-      <rect x="3" y="7" width="14" height="14" fill="hsl(43 72% 48%)" opacity="0.9" />
-      {/* Top face (3D effect) */}
-      <polygon points="3,7 10,3 24,3 17,7" fill="hsl(43 80% 60%)" opacity="0.85" />
-      {/* Right face */}
-      <polygon points="17,7 24,3 24,17 17,21" fill="hsl(43 50% 32%)" opacity="0.9" />
-      {/* Kiswa band (black cloth with gold trim) */}
-      <rect x="3" y="13" width="14" height="2.5" fill="hsl(43 60% 30%)" opacity="0.8" />
-      {/* Door */}
-      <rect x="7.5" y="15.5" width="4" height="5.5" fill="hsl(43 72% 38%)" />
-    </svg>
-  );
-}
-
 /* ── Qibla Compass ──────────────────────────────────────────────────── */
 function QiblaCompass({ bearing, isLoading }: { bearing: number | undefined; isLoading: boolean }) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const gold = "hsl(43 72% 48%)";
-  const goldLight = "hsl(43 80% 62%)";
-  const goldDim = "hsl(43 40% 28%)";
-  const bg = "hsl(230 30% 8%)";
+
+  const cx = 60;
+  const cy = 60;
+  const R = 56;     // outer ring radius
+  const Ri = 50;    // inner tick ring radius
 
   return (
     <div
@@ -232,119 +215,112 @@ function QiblaCompass({ bearing, isLoading }: { bearing: number | undefined; isL
             left: "50%",
             transform: "translateX(-50%)",
             background: "hsl(230 30% 10%)",
-            border: `1px solid ${gold}`,
-            color: goldLight,
+            border: "1px solid hsl(43 72% 48%)",
+            color: "hsl(43 85% 68%)",
             fontFamily: "Cinzel, serif",
             letterSpacing: "0.2em",
-            boxShadow: `0 0 12px hsl(43 72% 48% / 0.3)`,
+            boxShadow: "0 0 12px hsl(43 72% 48% / 0.35)",
           }}
         >
           Qibla: {Math.round(bearing)}°
-          {/* Tooltip arrow */}
           <span
             className="absolute"
             style={{
-              bottom: "-5px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: 0,
-              height: 0,
+              bottom: "-5px", left: "50%", transform: "translateX(-50%)",
+              width: 0, height: 0,
               borderLeft: "5px solid transparent",
               borderRight: "5px solid transparent",
-              borderTop: `5px solid ${gold}`,
+              borderTop: "5px solid hsl(43 72% 48%)",
             }}
           />
         </div>
       )}
 
-      {/* Compass SVG */}
-      <svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
-        {/* Outer decorative ring */}
-        <circle cx="40" cy="40" r="38" fill={bg} stroke={gold} strokeWidth="1.5" />
-        {/* Inner thin ring (Art Deco double border) */}
-        <circle cx="40" cy="40" r="33" fill="none" stroke={goldDim} strokeWidth="0.5" />
+      {/* Compass SVG — 120×120, center at (60,60) */}
+      <svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
 
-        {/* Cardinal tick marks */}
+        {/* Background fill */}
+        <circle cx={cx} cy={cy} r={R} fill="hsl(230 30% 7%)" />
+        {/* Outer gold ring */}
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke="hsl(43 72% 48%)" strokeWidth="2" />
+        {/* Inner decorative ring */}
+        <circle cx={cx} cy={cy} r={Ri} fill="none" stroke="hsl(43 40% 28%)" strokeWidth="0.6" />
+
+        {/* Tick marks at every 45° */}
         {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => {
-          const isMajor = angle % 90 === 0;
+          const major = angle % 90 === 0;
           const rad = (angle - 90) * (Math.PI / 180);
-          const x1 = 40 + 33 * Math.cos(rad);
-          const y1 = 40 + 33 * Math.sin(rad);
-          const x2 = 40 + (isMajor ? 27 : 30) * Math.cos(rad);
-          const y2 = 40 + (isMajor ? 27 : 30) * Math.sin(rad);
           return (
             <line
               key={angle}
-              x1={x1} y1={y1} x2={x2} y2={y2}
-              stroke={isMajor ? gold : goldDim}
-              strokeWidth={isMajor ? 1.2 : 0.6}
+              x1={cx + Ri * Math.cos(rad)} y1={cy + Ri * Math.sin(rad)}
+              x2={cx + (major ? 42 : 47) * Math.cos(rad)} y2={cy + (major ? 42 : 47) * Math.sin(rad)}
+              stroke={major ? "hsl(43 72% 48%)" : "hsl(43 40% 28%)"}
+              strokeWidth={major ? 1.5 : 0.8}
             />
           );
         })}
 
         {/* Cardinal letters */}
-        <text x="40" y="11" textAnchor="middle" dominantBaseline="middle" fontSize="7" fontFamily="Cinzel, serif" fill={gold} fontWeight="700">N</text>
-        <text x="40" y="71" textAnchor="middle" dominantBaseline="middle" fontSize="6" fontFamily="Cinzel, serif" fill={goldDim}>S</text>
-        <text x="70" y="40" textAnchor="middle" dominantBaseline="middle" fontSize="6" fontFamily="Cinzel, serif" fill={goldDim}>E</text>
-        <text x="10" y="40" textAnchor="middle" dominantBaseline="middle" fontSize="6" fontFamily="Cinzel, serif" fill={goldDim}>W</text>
+        <text x={cx}    y={cy - 40} textAnchor="middle" dominantBaseline="middle" fontSize="9"  fontFamily="Cinzel,serif" fill="hsl(43 85% 65%)" fontWeight="bold">N</text>
+        <text x={cx}    y={cy + 42} textAnchor="middle" dominantBaseline="middle" fontSize="7.5" fontFamily="Cinzel,serif" fill="hsl(43 40% 38%)">S</text>
+        <text x={cx+41} y={cy}      textAnchor="middle" dominantBaseline="middle" fontSize="7.5" fontFamily="Cinzel,serif" fill="hsl(43 40% 38%)">E</text>
+        <text x={cx-41} y={cy}      textAnchor="middle" dominantBaseline="middle" fontSize="7.5" fontFamily="Cinzel,serif" fill="hsl(43 40% 38%)">W</text>
 
-        {/* Loading spinner arc */}
+        {/* ── Needle — rotated by bearing, drawn BEFORE center so pivot covers the gap ── */}
+        {bearing !== undefined && !isLoading && (
+          <g transform={`rotate(${bearing}, ${cx}, ${cy})`}>
+            {/* White tip — points toward Qibla */}
+            <polygon
+              points={`${cx},${cy - 44}  ${cx - 6},${cy + 4}  ${cx + 6},${cy + 4}`}
+              fill="#ffffff"
+              stroke="#cccccc"
+              strokeWidth="0.5"
+              strokeLinejoin="round"
+            />
+            {/* Red tail — points away */}
+            <polygon
+              points={`${cx},${cy + 36}  ${cx - 4},${cy + 8}  ${cx + 4},${cy + 8}`}
+              fill="#e53935"
+              stroke="#ef5350"
+              strokeWidth="0.5"
+              strokeLinejoin="round"
+            />
+          </g>
+        )}
+
+        {/* Loading spinner */}
         {isLoading && (
-          <circle cx="40" cy="40" r="14" fill="none" stroke={goldDim} strokeWidth="1" strokeDasharray="22 66" strokeLinecap="round">
-            <animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="1.2s" repeatCount="indefinite" />
+          <circle cx={cx} cy={cy} r="20" fill="none" stroke="hsl(43 40% 28%)" strokeWidth="1.5" strokeDasharray="30 100" strokeLinecap="round">
+            <animateTransform attributeName="transform" type="rotate" from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="1.2s" repeatCount="indefinite" />
           </circle>
         )}
 
-        {/* Center circle behind icon */}
-        <circle cx="40" cy="40" r="11" fill="hsl(230 30% 12%)" stroke={goldDim} strokeWidth="0.8" />
+        {/* Center cap — covers needle base, sits on top */}
+        <circle cx={cx} cy={cy} r="14" fill="hsl(230 30% 10%)" stroke="hsl(43 45% 32%)" strokeWidth="1" />
 
-        {/* Kaaba icon centered — rendered as foreignObject for the React component */}
-        <foreignObject x="29" y="29" width="22" height="22">
-          <div
-            style={{
-              width: "100%",
-              height: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <KaabaIcon size={17} />
-          </div>
-        </foreignObject>
-
-        {/* ── Compass needle — rendered last so it sits on top ── */}
-        {bearing !== undefined && !isLoading && (
-          <g transform={`rotate(${bearing}, 40, 40)`}>
-            {/* Gold tip — points toward Qibla */}
-            <polygon
-              points="40,11 36.5,35 43.5,35"
-              fill={goldLight}
-              stroke="hsl(43 90% 72%)"
-              strokeWidth="0.4"
-              strokeLinejoin="round"
-            />
-            {/* Dimmer tail — points away */}
-            <polygon
-              points="40,62 37.5,46 42.5,46"
-              fill={goldDim}
-              strokeLinejoin="round"
-            />
-            {/* Pivot dot */}
-            <circle cx="40" cy="40" r="3" fill={gold} stroke="hsl(230 30% 8%)" strokeWidth="1" />
-          </g>
-        )}
+        {/* Kaaba icon in pure SVG (no foreignObject) */}
+        {/* Front face */}
+        <rect x={cx - 7} y={cy - 5} width="12" height="10" fill="hsl(43 65% 44%)" />
+        {/* Top face */}
+        <polygon points={`${cx-7},${cy-5} ${cx-3},${cy-9} ${cx+9},${cy-9} ${cx+5},${cy-5}`} fill="hsl(43 75% 56%)" />
+        {/* Right face */}
+        <polygon points={`${cx+5},${cy-5} ${cx+9},${cy-9} ${cx+9},${cy+1} ${cx+5},${cy+5}`} fill="hsl(43 45% 30%)" />
+        {/* Kiswa gold band */}
+        <rect x={cx - 7} y={cy - 1} width="12" height="2" fill="hsl(43 90% 62%)" />
+        {/* Pivot dot */}
+        <circle cx={cx} cy={cy} r="3" fill="hsl(43 72% 48%)" stroke="hsl(230 30% 7%)" strokeWidth="1" />
       </svg>
 
-      {/* Label below */}
+      {/* Label */}
       <p
-        className="text-center mt-0.5"
         style={{
           fontFamily: "Cinzel, serif",
-          fontSize: "7px",
-          letterSpacing: "0.25em",
-          color: goldDim,
+          fontSize: "8px",
+          letterSpacing: "0.3em",
+          color: "hsl(43 40% 35%)",
           textTransform: "uppercase",
+          marginTop: "2px",
         }}
       >
         Qibla
