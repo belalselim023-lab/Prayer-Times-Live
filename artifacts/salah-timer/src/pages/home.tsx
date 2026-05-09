@@ -25,8 +25,16 @@ interface TimingsData {
     gregorian: GregorianDate;
   };
   meta: {
+    latitude: number;
+    longitude: number;
     timezone: string;
   };
+}
+
+interface QiblaData {
+  latitude: number;
+  longitude: number;
+  bearing: number;
 }
 
 interface City {
@@ -40,20 +48,20 @@ interface City {
 }
 
 const CITIES: City[] = [
-  { id: "cairo", label: "Cairo", country: "Egypt", flag: "🇪🇬", apiCity: "Cairo", apiCountry: "Egypt", timezone: "Africa/Cairo" },
-  { id: "toronto", label: "Toronto", country: "Canada", flag: "🇨🇦", apiCity: "Toronto", apiCountry: "Canada", timezone: "America/Toronto" },
-  { id: "moscow", label: "Moscow", country: "Russia", flag: "🇷🇺", apiCity: "Moscow", apiCountry: "Russia", timezone: "Europe/Moscow" },
-  { id: "mecca", label: "Mecca", country: "Saudi Arabia", flag: "🇸🇦", apiCity: "Mecca", apiCountry: "Saudi Arabia", timezone: "Asia/Riyadh" },
-  { id: "jerusalem", label: "Jerusalem", country: "Palestine", flag: "🇵🇸", apiCity: "Jerusalem", apiCountry: "Palestine", timezone: "Asia/Jerusalem" },
+  { id: "cairo",    label: "Cairo",     country: "Egypt",        flag: "🇪🇬", apiCity: "Cairo",     apiCountry: "Egypt",        timezone: "Africa/Cairo"    },
+  { id: "toronto",  label: "Toronto",   country: "Canada",       flag: "🇨🇦", apiCity: "Toronto",   apiCountry: "Canada",       timezone: "America/Toronto" },
+  { id: "moscow",   label: "Moscow",    country: "Russia",       flag: "🇷🇺", apiCity: "Moscow",    apiCountry: "Russia",       timezone: "Europe/Moscow"   },
+  { id: "mecca",    label: "Mecca",     country: "Saudi Arabia", flag: "🇸🇦", apiCity: "Mecca",     apiCountry: "Saudi Arabia", timezone: "Asia/Riyadh"     },
+  { id: "jerusalem",label: "Jerusalem", country: "Palestine",    flag: "🇵🇸", apiCity: "Jerusalem", apiCountry: "Palestine",    timezone: "Asia/Jerusalem"  },
 ];
 
 const PRAYERS = [
-  { key: "Fajr", label: "Fajr", arabic: "الفجر", desc: "Pre-Dawn" },
-  { key: "Sunrise", label: "Sunrise", arabic: "الشروق", desc: "Dawn" },
-  { key: "Dhuhr", label: "Dhuhr", arabic: "الظهر", desc: "Midday" },
-  { key: "Asr", label: "Asr", arabic: "العصر", desc: "Afternoon" },
-  { key: "Maghrib", label: "Maghrib", arabic: "المغرب", desc: "Sunset" },
-  { key: "Isha", label: "Isha", arabic: "العشاء", desc: "Night" },
+  { key: "Fajr",    label: "Fajr",    arabic: "الفجر",  desc: "Pre-Dawn"  },
+  { key: "Sunrise", label: "Sunrise", arabic: "الشروق", desc: "Dawn"      },
+  { key: "Dhuhr",   label: "Dhuhr",   arabic: "الظهر",  desc: "Midday"    },
+  { key: "Asr",     label: "Asr",     arabic: "العصر",  desc: "Afternoon" },
+  { key: "Maghrib", label: "Maghrib", arabic: "المغرب", desc: "Sunset"    },
+  { key: "Isha",    label: "Isha",    arabic: "العشاء", desc: "Night"     },
 ];
 
 const ACTIVE_PRAYERS = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
@@ -103,7 +111,6 @@ function getNextPrayer(timings: Record<string, string>, cityH: number, cityM: nu
 function getCurrentPrayerPeriod(timings: Record<string, string>, cityH: number, cityM: number): "light" | "dark" {
   const currentMinutes = cityH * 60 + cityM;
   const maghrib = parseTimeToMinutes(timings.Maghrib || "00:00");
-
   return currentMinutes < maghrib ? "light" : "dark";
 }
 
@@ -123,6 +130,8 @@ function formatTime12(timeStr: string): { time: string; period: string } {
   if (h === 0) h = 12;
   return { time: `${String(h).padStart(2, "0")}:${m}`, period };
 }
+
+/* ── Art Deco helpers ─────────────────────────────────────────────── */
 
 function ArtDecoCorners() {
   return (
@@ -178,6 +187,161 @@ function StarDecoration() {
   );
 }
 
+/* ── Kaaba SVG icon ─────────────────────────────────────────────────── */
+function KaabaIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Main cube body */}
+      <rect x="3" y="7" width="14" height="14" fill="hsl(43 72% 48%)" opacity="0.9" />
+      {/* Top face (3D effect) */}
+      <polygon points="3,7 10,3 24,3 17,7" fill="hsl(43 80% 60%)" opacity="0.85" />
+      {/* Right face */}
+      <polygon points="17,7 24,3 24,17 17,21" fill="hsl(43 50% 32%)" opacity="0.9" />
+      {/* Kiswa band (black cloth with gold trim) */}
+      <rect x="3" y="13" width="14" height="2.5" fill="hsl(43 60% 30%)" opacity="0.8" />
+      {/* Door */}
+      <rect x="7.5" y="15.5" width="4" height="5.5" fill="hsl(43 72% 38%)" />
+    </svg>
+  );
+}
+
+/* ── Qibla Compass ──────────────────────────────────────────────────── */
+function QiblaCompass({ bearing, isLoading }: { bearing: number | undefined; isLoading: boolean }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const gold = "hsl(43 72% 48%)";
+  const goldLight = "hsl(43 80% 62%)";
+  const goldDim = "hsl(43 40% 28%)";
+  const bg = "hsl(230 30% 8%)";
+
+  return (
+    <div
+      className="relative inline-flex flex-col items-center"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      data-testid="compass-qibla"
+      style={{ cursor: "default" }}
+    >
+      {/* Tooltip */}
+      {showTooltip && bearing !== undefined && (
+        <div
+          className="absolute z-50 px-3 py-1.5 text-xs tracking-widest uppercase whitespace-nowrap"
+          style={{
+            bottom: "calc(100% + 8px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "hsl(230 30% 10%)",
+            border: `1px solid ${gold}`,
+            color: goldLight,
+            fontFamily: "Cinzel, serif",
+            letterSpacing: "0.2em",
+            boxShadow: `0 0 12px hsl(43 72% 48% / 0.3)`,
+          }}
+        >
+          Qibla: {Math.round(bearing)}°
+          {/* Tooltip arrow */}
+          <span
+            className="absolute"
+            style={{
+              bottom: "-5px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: 0,
+              height: 0,
+              borderLeft: "5px solid transparent",
+              borderRight: "5px solid transparent",
+              borderTop: `5px solid ${gold}`,
+            }}
+          />
+        </div>
+      )}
+
+      {/* Compass SVG */}
+      <svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+        {/* Outer decorative ring */}
+        <circle cx="40" cy="40" r="38" fill={bg} stroke={gold} strokeWidth="1.5" />
+        {/* Inner thin ring (Art Deco double border) */}
+        <circle cx="40" cy="40" r="33" fill="none" stroke={goldDim} strokeWidth="0.5" />
+
+        {/* Cardinal tick marks */}
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => {
+          const isMajor = angle % 90 === 0;
+          const rad = (angle - 90) * (Math.PI / 180);
+          const x1 = 40 + 33 * Math.cos(rad);
+          const y1 = 40 + 33 * Math.sin(rad);
+          const x2 = 40 + (isMajor ? 27 : 30) * Math.cos(rad);
+          const y2 = 40 + (isMajor ? 27 : 30) * Math.sin(rad);
+          return (
+            <line
+              key={angle}
+              x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={isMajor ? gold : goldDim}
+              strokeWidth={isMajor ? 1.2 : 0.6}
+            />
+          );
+        })}
+
+        {/* Cardinal letters */}
+        <text x="40" y="11" textAnchor="middle" dominantBaseline="middle" fontSize="7" fontFamily="Cinzel, serif" fill={gold} fontWeight="700">N</text>
+        <text x="40" y="71" textAnchor="middle" dominantBaseline="middle" fontSize="6" fontFamily="Cinzel, serif" fill={goldDim}>S</text>
+        <text x="70" y="40" textAnchor="middle" dominantBaseline="middle" fontSize="6" fontFamily="Cinzel, serif" fill={goldDim}>E</text>
+        <text x="10" y="40" textAnchor="middle" dominantBaseline="middle" fontSize="6" fontFamily="Cinzel, serif" fill={goldDim}>W</text>
+
+        {/* Qibla direction arrow — rotated around center by bearing degrees */}
+        {bearing !== undefined && !isLoading && (
+          <g transform={`rotate(${bearing}, 40, 40)`}>
+            {/* Arrow shaft */}
+            <line x1="40" y1="40" x2="40" y2="14" stroke={goldLight} strokeWidth="1.5" strokeLinecap="round" />
+            {/* Arrowhead */}
+            <polygon points="40,9 37,16 43,16" fill={goldLight} />
+            {/* Tail dot */}
+            <circle cx="40" cy="62" r="1.5" fill={goldDim} />
+          </g>
+        )}
+
+        {/* Loading spinner arc */}
+        {isLoading && (
+          <circle cx="40" cy="40" r="14" fill="none" stroke={goldDim} strokeWidth="1" strokeDasharray="22 66" strokeLinecap="round">
+            <animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="1.2s" repeatCount="indefinite" />
+          </circle>
+        )}
+
+        {/* Center circle behind icon */}
+        <circle cx="40" cy="40" r="11" fill="hsl(230 30% 12%)" stroke={goldDim} strokeWidth="0.8" />
+
+        {/* Kaaba icon centered — rendered as foreignObject for the React component */}
+        <foreignObject x="29" y="29" width="22" height="22">
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <KaabaIcon size={17} />
+          </div>
+        </foreignObject>
+      </svg>
+
+      {/* Label below */}
+      <p
+        className="text-center mt-0.5"
+        style={{
+          fontFamily: "Cinzel, serif",
+          fontSize: "7px",
+          letterSpacing: "0.25em",
+          color: goldDim,
+          textTransform: "uppercase",
+        }}
+      >
+        Qibla
+      </p>
+    </div>
+  );
+}
+
+/* ── Main Page ──────────────────────────────────────────────────────── */
 export default function Home() {
   const [selectedCity, setSelectedCity] = useState<City>(CITIES[0]);
   const [cityTime, setCityTime] = useState({ h: 0, m: 0, s: 0, display: "00:00:00" });
@@ -185,6 +349,7 @@ export default function Home() {
 
   const dateStr = getDateString();
 
+  /* Prayer times */
   const { data, isLoading, error } = useQuery<TimingsData>({
     queryKey: ["prayerTimes", selectedCity.id, dateStr],
     queryFn: async () => {
@@ -198,6 +363,24 @@ export default function Home() {
     retry: 2,
   });
 
+  /* Qibla direction — enabled once we have lat/lng from the timings response */
+  const lat = data?.meta?.latitude;
+  const lng = data?.meta?.longitude;
+
+  const { data: qiblaData, isLoading: qiblaLoading } = useQuery<QiblaData>({
+    queryKey: ["qibla", selectedCity.id, lat, lng],
+    queryFn: async () => {
+      const res = await fetch(`https://api.aladhan.com/v1/qibla/${lat}/${lng}`);
+      if (!res.ok) throw new Error("Failed to fetch qibla");
+      const json = await res.json();
+      return json.data as QiblaData;
+    },
+    enabled: lat !== undefined && lng !== undefined,
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: 2,
+  });
+
+  /* Live city clock */
   useEffect(() => {
     const tick = () => {
       const ct = getCityTime(selectedCity.timezone);
@@ -221,24 +404,23 @@ export default function Home() {
       : "linear-gradient(180deg, hsl(0 0% 0%) 0%, hsl(0 0% 4%) 45%, hsl(0 0% 8%) 100%)";
 
   return (
-    <div
-      className="min-h-screen w-full"
-      style={{
-        background: appBackground,
-      }}
-    >
+    <div className="min-h-screen w-full" style={{ background: appBackground }}>
       {/* Decorative top band */}
       <div
         className="w-full h-1"
-        style={{
-          background: "linear-gradient(90deg, transparent, hsl(43 72% 48%), hsl(43 80% 65%), hsl(43 72% 48%), transparent)",
-        }}
+        style={{ background: "linear-gradient(90deg, transparent, hsl(43 72% 48%), hsl(43 80% 65%), hsl(43 72% 48%), transparent)" }}
       />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
 
-        {/* ── Header ─────────────────────────────────────────────── */}
-        <header className="text-center mb-8">
+        {/* ── Header ──────────────────────────────────────────────── */}
+        <header className="relative text-center mb-8">
+
+          {/* Qibla compass — top left */}
+          <div className="absolute left-0 top-0" data-testid="compass-wrapper">
+            <QiblaCompass bearing={qiblaData?.bearing} isLoading={qiblaLoading && !qiblaData} />
+          </div>
+
           <div className="flex items-center justify-center gap-3 mb-3">
             <StarDecoration />
             <CrescentIcon />
@@ -263,7 +445,7 @@ export default function Home() {
           <ArtDecoDivider />
         </header>
 
-        {/* ── Hijri Date Display ──────────────────────────────────── */}
+        {/* ── Hijri Date Display ───────────────────────────────────── */}
         {hijri && (
           <div className="relative text-center mb-6 py-5 px-6" style={{ border: "1px solid hsl(43 35% 22%)" }}>
             <ArtDecoCorners />
@@ -291,7 +473,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── City Clock ──────────────────────────────────────────── */}
+        {/* ── City Clock ───────────────────────────────────────────── */}
         <div className="text-center mb-6">
           <p
             className="text-4xl md:text-5xl font-bold tracking-[0.15em] gold-text"
@@ -308,7 +490,7 @@ export default function Home() {
           </p>
         </div>
 
-        {/* ── City Selector ───────────────────────────────────────── */}
+        {/* ── City Selector ────────────────────────────────────────── */}
         <div className="mb-8">
           <ArtDecoDivider label="Select City" />
           <div className="flex flex-wrap justify-center gap-2 mt-4">
@@ -343,7 +525,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ── Next Prayer Banner ──────────────────────────────────── */}
+        {/* ── Next Prayer Banner ───────────────────────────────────── */}
         {nextPrayer && !isLoading && (
           <div
             className="text-center mb-6 py-3 px-6"
@@ -363,23 +545,20 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Loading State ───────────────────────────────────────── */}
+        {/* ── Loading State ────────────────────────────────────────── */}
         {isLoading && (
           <div className="text-center py-16" data-testid="status-loading">
             <div
               className="inline-block w-10 h-10 border-2 border-t-transparent rounded-full animate-spin mb-4"
               style={{ borderColor: "hsl(43 72% 48%)", borderTopColor: "transparent" }}
             />
-            <p
-              className="text-xs tracking-[0.3em] uppercase"
-              style={{ color: "hsl(43 35% 55%)", fontFamily: "Cinzel, serif" }}
-            >
+            <p className="text-xs tracking-[0.3em] uppercase" style={{ color: "hsl(43 35% 55%)", fontFamily: "Cinzel, serif" }}>
               Fetching Prayer Times
             </p>
           </div>
         )}
 
-        {/* ── Error State ─────────────────────────────────────────── */}
+        {/* ── Error State ──────────────────────────────────────────── */}
         {error && !isLoading && (
           <div
             className="text-center py-8 px-6 border"
@@ -395,7 +574,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Prayer Time Cards ───────────────────────────────────── */}
+        {/* ── Prayer Time Cards ────────────────────────────────────── */}
         {data && !isLoading && (
           <>
             <ArtDecoDivider label="Prayer Times" />
@@ -416,7 +595,6 @@ export default function Home() {
                   >
                     {isNext && <ArtDecoCorners />}
 
-                    {/* Arabic name */}
                     <p
                       className="text-right mb-1"
                       style={{
@@ -429,7 +607,6 @@ export default function Home() {
                       {prayer.arabic}
                     </p>
 
-                    {/* Decorative line */}
                     <div
                       className="h-px mb-2"
                       style={{
@@ -439,40 +616,26 @@ export default function Home() {
                       }}
                     />
 
-                    {/* Prayer name */}
                     <p
                       className="text-xs tracking-[0.25em] uppercase mb-0.5"
-                      style={{
-                        fontFamily: "Cinzel, serif",
-                        color: isNext ? "hsl(43 80% 72%)" : "hsl(43 25% 55%)",
-                      }}
+                      style={{ fontFamily: "Cinzel, serif", color: isNext ? "hsl(43 80% 72%)" : "hsl(43 25% 55%)" }}
                     >
                       {prayer.label}
                     </p>
 
-                    {/* Description */}
                     <p
                       className="text-xs mb-2"
-                      style={{
-                        fontFamily: "Cormorant Garamond, serif",
-                        color: "hsl(43 20% 42%)",
-                        letterSpacing: "0.05em",
-                      }}
+                      style={{ fontFamily: "Cormorant Garamond, serif", color: "hsl(43 20% 42%)", letterSpacing: "0.05em" }}
                     >
                       {prayer.desc}
                     </p>
 
-                    {/* Time */}
                     <div className="flex items-end gap-1">
                       <p
                         className="text-2xl md:text-3xl font-bold leading-none"
                         style={{
                           fontFamily: "Cinzel, serif",
-                          color: isNext
-                            ? "hsl(43 80% 68%)"
-                            : isSunrise
-                            ? "hsl(43 40% 55%)"
-                            : "hsl(43 55% 80%)",
+                          color: isNext ? "hsl(43 80% 68%)" : isSunrise ? "hsl(43 40% 55%)" : "hsl(43 55% 80%)",
                         }}
                         data-testid={`text-time-${prayer.key.toLowerCase()}`}
                       >
@@ -480,10 +643,7 @@ export default function Home() {
                       </p>
                       <p
                         className="text-xs mb-0.5 tracking-widest"
-                        style={{
-                          fontFamily: "Cinzel, serif",
-                          color: isNext ? "hsl(43 60% 55%)" : "hsl(43 25% 45%)",
-                        }}
+                        style={{ fontFamily: "Cinzel, serif", color: isNext ? "hsl(43 60% 55%)" : "hsl(43 25% 45%)" }}
                       >
                         {period}
                       </p>
@@ -491,10 +651,7 @@ export default function Home() {
 
                     {isNext && (
                       <div className="mt-2">
-                        <p
-                          className="text-xs tracking-[0.2em] uppercase"
-                          style={{ color: "hsl(43 65% 58%)", fontFamily: "Cinzel, serif" }}
-                        >
+                        <p className="text-xs tracking-[0.2em] uppercase" style={{ color: "hsl(43 65% 58%)", fontFamily: "Cinzel, serif" }}>
                           &#9658; Next
                         </p>
                       </div>
@@ -504,7 +661,6 @@ export default function Home() {
               })}
             </div>
 
-            {/* Method note */}
             <p
               className="text-center mt-6 text-xs tracking-widest uppercase"
               style={{ color: "hsl(43 20% 38%)", fontFamily: "Cinzel, serif" }}
@@ -518,9 +674,7 @@ export default function Home() {
       {/* Decorative bottom band */}
       <div
         className="w-full h-1 mt-8"
-        style={{
-          background: "linear-gradient(90deg, transparent, hsl(43 72% 48%), hsl(43 80% 65%), hsl(43 72% 48%), transparent)",
-        }}
+        style={{ background: "linear-gradient(90deg, transparent, hsl(43 72% 48%), hsl(43 80% 65%), hsl(43 72% 48%), transparent)" }}
       />
     </div>
   );
