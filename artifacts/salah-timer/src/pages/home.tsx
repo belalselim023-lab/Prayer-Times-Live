@@ -68,6 +68,19 @@ const PRAYERS = [
 
 const ACTIVE_PRAYERS = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
 
+/* ── Compute Qibla bearing locally (no API needed) ──────────────────── */
+function computeQibla(lat: number, lng: number): number {
+  const MECCA_LAT = 21.4225;
+  const MECCA_LNG = 39.8262;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const lat1 = toRad(lat);
+  const lat2 = toRad(MECCA_LAT);
+  const dLng  = toRad(MECCA_LNG - lng);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
 function getDateString(): string {
   const now = new Date();
   const d = String(now.getDate()).padStart(2, "0");
@@ -193,10 +206,11 @@ function StarDecoration() {
 function QiblaCompass({ bearing, isLoading }: { bearing: number | undefined; isLoading: boolean }) {
   const [showTooltip, setShowTooltip] = useState(false);
 
-  const cx = 60;
-  const cy = 60;
-  const R = 56;     // outer ring radius
-  const Ri = 50;    // inner tick ring radius
+  // SVG canvas 160×160, compass circle centred at (80,80)
+  const cx = 80;
+  const cy = 80;
+  const R  = 74;   // outer radius
+  const Rt = 66;   // tick ring radius
 
   return (
     <div
@@ -236,93 +250,104 @@ function QiblaCompass({ bearing, isLoading }: { bearing: number | undefined; isL
         </div>
       )}
 
-      {/* Compass SVG — 120×120, center at (60,60) */}
-      <svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      {/* Compass SVG — 160×160 */}
+      <svg
+        width="160"
+        height="160"
+        viewBox="0 0 160 160"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ display: "block" }}
+      >
+        <defs>
+          <clipPath id="compassClip">
+            <circle cx={cx} cy={cy} r={R} />
+          </clipPath>
+        </defs>
 
-        {/* Background fill */}
+        {/* ── Layer 1: Background ── */}
         <circle cx={cx} cy={cy} r={R} fill="hsl(230 30% 7%)" />
-        {/* Outer gold ring */}
-        <circle cx={cx} cy={cy} r={R} fill="none" stroke="hsl(43 72% 48%)" strokeWidth="2" />
-        {/* Inner decorative ring */}
-        <circle cx={cx} cy={cy} r={Ri} fill="none" stroke="hsl(43 40% 28%)" strokeWidth="0.6" />
 
-        {/* Tick marks at every 45° */}
+        {/* ── Layer 2: Decorative rings ── */}
+        <circle cx={cx} cy={cy} r={R}    fill="none" stroke="hsl(43 72% 48%)" strokeWidth="2.5" />
+        <circle cx={cx} cy={cy} r={R-6}  fill="none" stroke="hsl(43 40% 22%)" strokeWidth="0.8" />
+        <circle cx={cx} cy={cy} r={Rt}   fill="none" stroke="hsl(43 40% 22%)" strokeWidth="0.6" />
+
+        {/* ── Layer 3: Tick marks ── */}
         {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => {
           const major = angle % 90 === 0;
           const rad = (angle - 90) * (Math.PI / 180);
+          const x1 = cx + Rt * Math.cos(rad);
+          const y1 = cy + Rt * Math.sin(rad);
+          const x2 = cx + (major ? 56 : 62) * Math.cos(rad);
+          const y2 = cy + (major ? 56 : 62) * Math.sin(rad);
           return (
-            <line
-              key={angle}
-              x1={cx + Ri * Math.cos(rad)} y1={cy + Ri * Math.sin(rad)}
-              x2={cx + (major ? 42 : 47) * Math.cos(rad)} y2={cy + (major ? 42 : 47) * Math.sin(rad)}
-              stroke={major ? "hsl(43 72% 48%)" : "hsl(43 40% 28%)"}
-              strokeWidth={major ? 1.5 : 0.8}
+            <line key={angle} x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={major ? "hsl(43 72% 48%)" : "hsl(43 40% 30%)"}
+              strokeWidth={major ? 2 : 0.9}
             />
           );
         })}
 
-        {/* Cardinal letters */}
-        <text x={cx}    y={cy - 40} textAnchor="middle" dominantBaseline="middle" fontSize="9"  fontFamily="Cinzel,serif" fill="hsl(43 85% 65%)" fontWeight="bold">N</text>
-        <text x={cx}    y={cy + 42} textAnchor="middle" dominantBaseline="middle" fontSize="7.5" fontFamily="Cinzel,serif" fill="hsl(43 40% 38%)">S</text>
-        <text x={cx+41} y={cy}      textAnchor="middle" dominantBaseline="middle" fontSize="7.5" fontFamily="Cinzel,serif" fill="hsl(43 40% 38%)">E</text>
-        <text x={cx-41} y={cy}      textAnchor="middle" dominantBaseline="middle" fontSize="7.5" fontFamily="Cinzel,serif" fill="hsl(43 40% 38%)">W</text>
+        {/* ── Layer 4: Cardinal letters (fixed, don't rotate) ── */}
+        <text x={cx}    y={cy-53} textAnchor="middle" dominantBaseline="middle" fontSize="12" fontFamily="Cinzel,serif" fill="hsl(43 85% 68%)" fontWeight="bold">N</text>
+        <text x={cx}    y={cy+55} textAnchor="middle" dominantBaseline="middle" fontSize="10" fontFamily="Cinzel,serif" fill="hsl(43 40% 40%)">S</text>
+        <text x={cx+55} y={cy}    textAnchor="middle" dominantBaseline="middle" fontSize="10" fontFamily="Cinzel,serif" fill="hsl(43 40% 40%)">E</text>
+        <text x={cx-55} y={cy}    textAnchor="middle" dominantBaseline="middle" fontSize="10" fontFamily="Cinzel,serif" fill="hsl(43 40% 40%)">W</text>
 
-        {/* ── Needle — rotated by bearing, drawn after center so it stays visible ── */}
-        {bearing !== undefined && !isLoading && (
-          <g transform={`rotate(${bearing}, ${cx}, ${cy})`}>
-            {/* Needle tip */}
-            <polygon
-              points={`${cx},${cy - 48}  ${cx - 8},${cy + 8}  ${cx + 8},${cy + 8}`}
-              fill="#f7f2df"
-              stroke="#d7b24c"
-              strokeWidth="1"
-              strokeLinejoin="round"
-            />
-            {/* Needle tail */}
-            <polygon
-              points={`${cx},${cy + 40}  ${cx - 5},${cy + 12}  ${cx + 5},${cy + 12}`}
-              fill="#e53935"
-              stroke="#ff7a70"
-              strokeWidth="1"
-              strokeLinejoin="round"
-            />
-          </g>
-        )}
-
-        {/* Loading spinner */}
+        {/* ── Layer 5: Loading spinner ── */}
         {isLoading && (
-          <circle cx={cx} cy={cy} r="20" fill="none" stroke="hsl(43 40% 28%)" strokeWidth="1.5" strokeDasharray="30 100" strokeLinecap="round">
+          <circle cx={cx} cy={cy} r="28" fill="none" stroke="hsl(43 40% 30%)" strokeWidth="2" strokeDasharray="40 130" strokeLinecap="round">
             <animateTransform attributeName="transform" type="rotate" from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="1.2s" repeatCount="indefinite" />
           </circle>
         )}
 
-        {/* Center cap — sits above the needle base */}
-        <circle cx={cx} cy={cy} r="10" fill="hsl(230 30% 10%)" stroke="hsl(43 45% 32%)" strokeWidth="1" />
+        {/* ── Layer 6: Center decorative circle (behind Kaaba, above ticks) ── */}
+        <circle cx={cx} cy={cy} r="20" fill="hsl(230 30% 11%)" stroke="hsl(43 50% 30%)" strokeWidth="1.2" />
 
-        {/* Kaaba icon in pure SVG (no foreignObject) */}
+        {/* ── Layer 7: Kaaba (pure SVG cube, centred at cx,cy) ── */}
         {/* Front face */}
-        <rect x={cx - 6} y={cy - 4} width="10" height="8" fill="hsl(43 65% 44%)" />
+        <rect x={cx-8} y={cy-5} width="14" height="12" fill="hsl(43 60% 38%)" />
         {/* Top face */}
-        <polygon points={`${cx-6},${cy-4} ${cx-3},${cy-8} ${cx+7},${cy-8} ${cx+4},${cy-4}`} fill="hsl(43 75% 56%)" />
+        <polygon points={`${cx-8},${cy-5} ${cx-4},${cy-10} ${cx+10},${cy-10} ${cx+6},${cy-5}`} fill="hsl(43 72% 52%)" />
         {/* Right face */}
-        <polygon points={`${cx+4},${cy-4} ${cx+7},${cy-8} ${cx+7},${cy+0} ${cx+4},${cy+4}`} fill="hsl(43 45% 30%)" />
+        <polygon points={`${cx+6},${cy-5} ${cx+10},${cy-10} ${cx+10},${cy+2} ${cx+6},${cy+7}`} fill="hsl(43 40% 26%)" />
         {/* Kiswa gold band */}
-        <rect x={cx - 6} y={cy - 1} width="10" height="1.5" fill="hsl(43 90% 62%)" />
-        {/* Pivot dot */}
-        <circle cx={cx} cy={cy} r="2.5" fill="hsl(43 72% 48%)" stroke="hsl(230 30% 7%)" strokeWidth="1" />
+        <rect x={cx-8} y={cy-1} width="14" height="2.5" fill="hsl(43 88% 60%)" />
+
+        {/* ── Layer 8: Needle — LAST so it's always on top ── */}
+        {bearing !== undefined && !isLoading && (
+          <g transform={`rotate(${bearing}, ${cx}, ${cy})`}>
+            {/* Gold/white tip pointing toward Qibla */}
+            <polygon
+              points={`${cx},${cy-62}  ${cx-7},${cy-14}  ${cx+7},${cy-14}`}
+              fill="#fffff0"
+              stroke="hsl(43 80% 60%)"
+              strokeWidth="1"
+              strokeLinejoin="round"
+            />
+            {/* Red tail pointing away */}
+            <polygon
+              points={`${cx},${cy+54}  ${cx-5},${cy+16}  ${cx+5},${cy+16}`}
+              fill="#d32f2f"
+              stroke="#f44336"
+              strokeWidth="1"
+              strokeLinejoin="round"
+            />
+            {/* Bright pivot dot at exact centre */}
+            <circle cx={cx} cy={cy} r="5" fill="hsl(43 80% 55%)" stroke="hsl(230 30% 8%)" strokeWidth="1.5" />
+          </g>
+        )}
       </svg>
 
       {/* Label */}
-      <p
-        style={{
-          fontFamily: "Cinzel, serif",
-          fontSize: "8px",
-          letterSpacing: "0.3em",
-          color: "hsl(43 40% 35%)",
-          textTransform: "uppercase",
-          marginTop: "2px",
-        }}
-      >
+      <p style={{
+        fontFamily: "Cinzel, serif",
+        fontSize: "9px",
+        letterSpacing: "0.3em",
+        color: "hsl(43 40% 36%)",
+        textTransform: "uppercase",
+        marginTop: "3px",
+      }}>
         Qibla
       </p>
     </div>
@@ -402,7 +427,10 @@ export default function Home() {
 
           {/* Qibla compass — top left */}
           <div className="absolute left-0 top-0" data-testid="compass-wrapper">
-            <QiblaCompass bearing={qiblaData?.bearing} isLoading={qiblaLoading && !qiblaData} />
+            <QiblaCompass
+              bearing={qiblaData?.bearing ?? computeQibla(selectedCity.lat, selectedCity.lng)}
+              isLoading={false}
+            />
           </div>
 
           <div className="flex items-center justify-center gap-3 mb-3">
