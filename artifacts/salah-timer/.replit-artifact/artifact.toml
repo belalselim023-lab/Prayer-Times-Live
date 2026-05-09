@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Salah Timer"
+version = "1.0.0"
+id = "artifacts/salah-timer"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22806
+
+[services.development]
+run = "pnpm --filter @workspace/salah-timer run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/salah-timer", "run", "build" ]
+publicDir = "artifacts/salah-timer/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22806"
+BASE_PATH = "/"
