@@ -100,6 +100,21 @@ function getNextPrayer(timings: Record<string, string>, cityH: number, cityM: nu
   return { name: "Fajr", remainingMinutes: 24 * 60 - currentMinutes + fajrMinutes };
 }
 
+function getCurrentPrayerPeriod(timings: Record<string, string>, cityH: number, cityM: number): "light" | "dark" {
+  const currentMinutes = cityH * 60 + cityM;
+  const fajr = parseTimeToMinutes(timings.Fajr || "00:00");
+  const sunrise = parseTimeToMinutes(timings.Sunrise || "00:00");
+  const dhuhr = parseTimeToMinutes(timings.Dhuhr || "00:00");
+  const asr = parseTimeToMinutes(timings.Asr || "00:00");
+  const maghrib = parseTimeToMinutes(timings.Maghrib || "00:00");
+  const isha = parseTimeToMinutes(timings.Isha || "00:00");
+
+  if (currentMinutes >= fajr && currentMinutes < sunrise) return "light";
+  if (currentMinutes >= sunrise && currentMinutes < maghrib) return "light";
+  if (currentMinutes >= maghrib && currentMinutes < isha) return "dark";
+  return "dark";
+}
+
 function formatCountdown(totalMinutes: number): string {
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
@@ -207,10 +222,11 @@ export default function Home() {
 
   const hijri = data?.date?.hijri;
   const gregorian = data?.date?.gregorian;
-  const isDaytime = cityTime.h >= 6 && cityTime.h < 18;
-  const appBackground = isDaytime
-    ? "linear-gradient(180deg, hsl(43 45% 16%) 0%, hsl(43 35% 13%) 45%, hsl(43 30% 11%) 100%)"
-    : "linear-gradient(180deg, hsl(230 35% 5%) 0%, hsl(230 30% 7%) 40%, hsl(230 30% 8%) 100%)";
+  const prayerPeriod = data?.timings ? getCurrentPrayerPeriod(data.timings, cityTime.h, cityTime.m) : "dark";
+  const appBackground =
+    prayerPeriod === "light"
+      ? "linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 97%) 45%, hsl(0 0% 94%) 100%)"
+      : "linear-gradient(180deg, hsl(0 0% 5%) 0%, hsl(0 0% 8%) 45%, hsl(0 0% 10%) 100%)";
 
   return (
     <div
