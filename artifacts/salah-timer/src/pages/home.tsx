@@ -45,14 +45,16 @@ interface City {
   apiCity: string;
   apiCountry: string;
   timezone: string;
+  lat: number;
+  lng: number;
 }
 
 const CITIES: City[] = [
-  { id: "cairo",    label: "Cairo",     country: "Egypt",        flag: "🇪🇬", apiCity: "Cairo",     apiCountry: "Egypt",        timezone: "Africa/Cairo"    },
-  { id: "toronto",  label: "Toronto",   country: "Canada",       flag: "🇨🇦", apiCity: "Toronto",   apiCountry: "Canada",       timezone: "America/Toronto" },
-  { id: "moscow",   label: "Moscow",    country: "Russia",       flag: "🇷🇺", apiCity: "Moscow",    apiCountry: "Russia",       timezone: "Europe/Moscow"   },
-  { id: "mecca",    label: "Mecca",     country: "Saudi Arabia", flag: "🇸🇦", apiCity: "Mecca",     apiCountry: "Saudi Arabia", timezone: "Asia/Riyadh"     },
-  { id: "jerusalem",label: "Jerusalem", country: "Palestine",    flag: "🇵🇸", apiCity: "Jerusalem", apiCountry: "Palestine",    timezone: "Asia/Jerusalem"  },
+  { id: "cairo",    label: "Cairo",     country: "Egypt",        flag: "🇪🇬", apiCity: "Cairo",     apiCountry: "Egypt",        timezone: "Africa/Cairo",    lat: 30.0444, lng: 31.2357  },
+  { id: "toronto",  label: "Toronto",   country: "Canada",       flag: "🇨🇦", apiCity: "Toronto",   apiCountry: "Canada",       timezone: "America/Toronto", lat: 43.6532, lng: -79.3832 },
+  { id: "moscow",   label: "Moscow",    country: "Russia",       flag: "🇷🇺", apiCity: "Moscow",    apiCountry: "Russia",       timezone: "Europe/Moscow",   lat: 55.7558, lng: 37.6173  },
+  { id: "mecca",    label: "Mecca",     country: "Saudi Arabia", flag: "🇸🇦", apiCity: "Mecca",     apiCountry: "Saudi Arabia", timezone: "Asia/Riyadh",     lat: 21.3891, lng: 39.8579  },
+  { id: "jerusalem",label: "Jerusalem", country: "Palestine",    flag: "🇵🇸", apiCity: "Jerusalem", apiCountry: "Palestine",    timezone: "Asia/Jerusalem",  lat: 31.7683, lng: 35.2137  },
 ];
 
 const PRAYERS = [
@@ -363,19 +365,15 @@ export default function Home() {
     retry: 2,
   });
 
-  /* Qibla direction — enabled once we have lat/lng from the timings response */
-  const lat = data?.meta?.latitude;
-  const lng = data?.meta?.longitude;
-
+  /* Qibla direction — uses hardcoded city coordinates, fires immediately */
   const { data: qiblaData, isLoading: qiblaLoading } = useQuery<QiblaData>({
-    queryKey: ["qibla", selectedCity.id, lat, lng],
+    queryKey: ["qibla", selectedCity.id],
     queryFn: async () => {
-      const res = await fetch(`https://api.aladhan.com/v1/qibla/${lat}/${lng}`);
+      const res = await fetch(`https://api.aladhan.com/v1/qibla/${selectedCity.lat}/${selectedCity.lng}`);
       if (!res.ok) throw new Error("Failed to fetch qibla");
       const json = await res.json();
       return json.data as QiblaData;
     },
-    enabled: lat !== undefined && lng !== undefined,
     staleTime: 24 * 60 * 60 * 1000,
     retry: 2,
   });
