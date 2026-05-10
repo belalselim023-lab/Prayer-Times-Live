@@ -572,6 +572,24 @@ export default function Home() {
                 {adhanEnabled ? "Adhan" : "Muted"}
               </p>
             )}
+            {/* Test button */}
+            <button
+              onClick={() => adhanPlaying ? stopAdhan() : playAdhan()}
+              style={{
+                fontFamily: "Cinzel, serif",
+                fontSize: "6px",
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+                color: "hsl(43 60% 45%)",
+                background: "none",
+                border: "1px solid hsl(43 40% 28%)",
+                padding: "2px 6px",
+                cursor: "pointer",
+                marginTop: 2,
+              }}
+            >
+              {adhanPlaying ? "Stop" : "Test"}
+            </button>
           </div>
 
           <div className="flex items-center justify-center gap-3 mb-3">
