@@ -361,36 +361,62 @@ export default function Home() {
   const [nextPrayer, setNextPrayer] = useState<{ name: string; remainingMinutes: number } | null>(null);
   const [adhanEnabled, setAdhanEnabled] = useState(true);
   const [adhanPlaying, setAdhanPlaying] = useState(false);
-  const audioRef  = useRef<HTMLAudioElement | null>(null);
-  const playedRef = useRef<Set<string>>(new Set());
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const audioRef       = useRef<HTMLAudioElement | null>(null);
+  const audioUnlockedRef = useRef(false);
+  const playedRef      = useRef<Set<string>>(new Set());
 
-  /* Play / stop adhan */
+  const ADHAN_SOURCES = [
+    "https://www.islamcan.com/audio/adhan/azan1.mp3",
+    "https://ia800300.us.archive.org/18/items/adhaan_makkah/adhaan_makkah.mp3",
+    "https://audio.islamicaudio.net/adhan/adhan.mp3",
+  ];
+
+  /* Pre-load audio on mount — tries sources until one loads */
+  useEffect(() => {
+    let idx = 0;
+    const tryLoad = () => {
+      if (idx >= ADHAN_SOURCES.length) return;
+      const audio = new Audio(ADHAN_SOURCES[idx]);
+      audio.preload = "auto";
+      audio.volume = 0.85;
+      audio.oncanplaythrough = () => { audioRef.current = audio; };
+      audio.onerror = () => { idx++; tryLoad(); };
+      audio.load();
+    };
+    tryLoad();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* Unlock audio — must be called from a direct user gesture (click) */
+  const unlockAudio = useCallback(() => {
+    if (audioUnlockedRef.current || !audioRef.current) return;
+    const audio = audioRef.current;
+    const saved = audio.volume;
+    audio.volume = 0;
+    audio.play()
+      .then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = saved;
+        audioUnlockedRef.current = true;
+        setAudioUnlocked(true);
+      })
+      .catch(() => {
+        audio.volume = saved;
+      });
+  }, []);
+
+  /* Play adhan — reuses pre-loaded element so autoplay is allowed */
   const playAdhan = useCallback(() => {
-    try {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
-      // Try sources in order — first working one plays
-      const ADHAN_SOURCES = [
-        "https://www.islamcan.com/audio/adhan/azan1.mp3",
-        "https://ia800300.us.archive.org/18/items/adhaan_makkah/adhaan_makkah.mp3",
-        "https://audio.islamicaudio.net/adhan/adhan.mp3",
-      ];
-      const trySource = (index: number) => {
-        if (index >= ADHAN_SOURCES.length) { setAdhanPlaying(false); return; }
-        const audio = new Audio(ADHAN_SOURCES[index]);
-        audio.volume = 0.85;
-        audioRef.current = audio;
-        audio.onplay  = () => setAdhanPlaying(true);
-        audio.onended = () => setAdhanPlaying(false);
-        audio.onerror = () => trySource(index + 1);
-        audio.play().catch(() => trySource(index + 1));
-      };
-      trySource(0);
-    } catch {
-      setAdhanPlaying(false);
-    }
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = 0;
+    audio.volume = 0.85;
+    audio.onplay  = () => setAdhanPlaying(true);
+    audio.onended = () => setAdhanPlaying(false);
+    audio.onerror = () => setAdhanPlaying(false);
+    audio.play().catch(() => setAdhanPlaying(false));
   }, []);
 
   const stopAdhan = useCallback(() => {
@@ -444,7 +470,8 @@ export default function Home() {
         setNextPrayer(np);
 
         /* Fire adhan at second 0 of each prayer minute */
-        if (ct.s === 0 && adhanEnabled) {
+        /* Widen to 20s window — handles tabs that wake up mid-second */
+        if (ct.s <= 20 && adhanEnabled) {
           const nowMins = ct.h * 60 + ct.m;
           for (const prayerKey of ACTIVE_PRAYERS) {
             const raw = data.timings[prayerKey];
@@ -500,6 +527,7 @@ export default function Home() {
           <div className="absolute right-0 top-0 flex flex-col items-center gap-1">
             <button
               onClick={() => {
+                unlockAudio();
                 if (adhanEnabled) {
                   stopAdhan();
                   setAdhanEnabled(false);
@@ -576,9 +604,28 @@ export default function Home() {
                 {adhanEnabled ? "Adhan" : "Muted"}
               </p>
             )}
+            {/* "Tap to enable" hint — shown until first user gesture unlocks audio */}
+            {!audioUnlocked && adhanEnabled && !adhanPlaying && (
+              <p style={{
+                fontFamily: "Cinzel, serif",
+                fontSize: "6px",
+                letterSpacing: "0.12em",
+                color: "hsl(43 60% 42%)",
+                textTransform: "uppercase",
+                textAlign: "center",
+                marginTop: 1,
+                maxWidth: 60,
+                lineHeight: 1.4,
+              }}>
+                tap to enable
+              </p>
+            )}
             {/* Test button */}
             <button
-              onClick={() => adhanPlaying ? stopAdhan() : playAdhan()}
+              onClick={() => {
+                unlockAudio();
+                adhanPlaying ? stopAdhan() : playAdhan();
+              }}
               style={{
                 fontFamily: "Cinzel, serif",
                 fontSize: "6px",
