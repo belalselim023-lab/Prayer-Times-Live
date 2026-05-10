@@ -550,6 +550,7 @@ export default function Home() {
   const gregorian = data?.date?.gregorian;
   const prayerPeriod = data?.timings ? getCurrentPrayerPeriod(data.timings, cityTime.h, cityTime.m) : "dark";
   const currentPrayerKey = data?.timings ? getNextPrayer(data.timings, cityTime.h, cityTime.m).name : null;
+  const countdownLabel = nextPrayer ? formatCountdown(nextPrayer.remainingMinutes) : null;
   const appBackground =
     prayerPeriod === "light"
       ? "linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 98%) 45%, hsl(0 0% 95%) 100%)"
@@ -778,6 +779,14 @@ export default function Home() {
           >
             {selectedCity.label} Local Time
           </p>
+          {nextPrayer && (
+            <p
+              className="text-xs tracking-[0.3em] uppercase mt-2"
+              style={{ color: "hsl(43 60% 45%)", fontFamily: "Cinzel, serif" }}
+            >
+              {nextPrayer.name} in {countdownLabel}
+            </p>
+          )}
 
           {/* Debug controls — jump clock to next prayer time */}
           <div className="flex justify-center items-center gap-2 mt-3">
