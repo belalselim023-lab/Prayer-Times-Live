@@ -549,6 +549,7 @@ export default function Home() {
   const hijri = data?.date?.hijri;
   const gregorian = data?.date?.gregorian;
   const prayerPeriod = data?.timings ? getCurrentPrayerPeriod(data.timings, cityTime.h, cityTime.m) : "dark";
+  const currentPrayerKey = data?.timings ? getNextPrayer(data.timings, cityTime.h, cityTime.m).name : null;
   const appBackground =
     prayerPeriod === "light"
       ? "linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 98%) 45%, hsl(0 0% 95%) 100%)"
@@ -913,7 +914,7 @@ export default function Home() {
               {PRAYERS.map((prayer) => {
                 const timeStr = data.timings[prayer.key] || "--:--";
                 const { time, period } = formatTime12(timeStr);
-                const isNext = nextPrayer?.name === prayer.key;
+                const isNext = currentPrayerKey === prayer.key;
                 const isSunrise = prayer.key === "Sunrise";
 
                 return (
