@@ -421,6 +421,13 @@ export default function Home() {
       });
   }, []);
 
+  const unlockAndPlayAdhan = useCallback(() => {
+    unlockAudio();
+    window.setTimeout(() => {
+      playAdhan();
+    }, 50);
+  }, [unlockAudio, playAdhan]);
+
   /* Play adhan — reuses pre-loaded element so autoplay is allowed */
   const playAdhan = useCallback(() => {
     const audio = audioRef.current;
@@ -668,8 +675,11 @@ export default function Home() {
             {/* Test button */}
             <button
               onClick={() => {
-                unlockAudio();
-                adhanPlaying ? stopAdhan() : playAdhan();
+                if (adhanPlaying) {
+                  stopAdhan();
+                } else {
+                  unlockAndPlayAdhan();
+                }
               }}
               style={{
                 fontFamily: "Cinzel, serif",
@@ -686,6 +696,18 @@ export default function Home() {
             >
               {adhanPlaying ? "Stop" : "Test"}
             </button>
+            {audioUnlocked && (
+              <p style={{
+                fontFamily: "Cinzel, serif",
+                fontSize: "6px",
+                letterSpacing: "0.18em",
+                color: "hsl(43 60% 42%)",
+                textTransform: "uppercase",
+                marginTop: 1,
+              }}>
+                audio unlocked
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-center gap-3 mb-3">
