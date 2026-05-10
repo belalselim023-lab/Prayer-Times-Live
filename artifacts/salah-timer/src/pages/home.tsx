@@ -401,7 +401,7 @@ export default function Home() {
     setAdhanPlaying(false);
   }, []);
 
-  const dateStr = getDateString();
+  const [dateStr, setDateStr] = useState(getDateString);
 
   /* Prayer times */
   const { data, isLoading, error } = useQuery<TimingsData>({
@@ -413,7 +413,7 @@ export default function Home() {
       const json = await res.json();
       return json.data as TimingsData;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 60 * 1000,   // 1 hour — re-fetches on new day when dateStr changes
     retry: 2,
   });
 
@@ -435,6 +435,10 @@ export default function Home() {
     const tick = () => {
       const ct = getCityTime(selectedCity.timezone);
       setCityTime(ct);
+
+      /* Auto-refresh prayer times at midnight */
+      const today = getDateString();
+      setDateStr(prev => prev !== today ? today : prev);
       if (data?.timings) {
         const np = getNextPrayer(data.timings, ct.h, ct.m);
         setNextPrayer(np);
