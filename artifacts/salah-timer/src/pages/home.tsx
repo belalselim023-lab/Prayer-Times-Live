@@ -421,13 +421,6 @@ export default function Home() {
       });
   }, []);
 
-  const unlockAndPlayAdhan = useCallback(() => {
-    unlockAudio();
-    window.setTimeout(() => {
-      playAdhan();
-    }, 50);
-  }, [unlockAudio, playAdhan]);
-
   /* Play adhan — reuses pre-loaded element so autoplay is allowed */
   const playAdhan = useCallback(() => {
     const audio = audioRef.current;
@@ -447,6 +440,13 @@ export default function Home() {
     }
     setAdhanPlaying(false);
   }, []);
+
+  const unlockAndPlayAdhan = useCallback(() => {
+    unlockAudio();
+    window.setTimeout(() => {
+      playAdhan();
+    }, 50);
+  }, [unlockAudio, playAdhan]);
 
   const [dateStr, setDateStr] = useState(() => getCityDateString(selectedCity.timezone));
 
