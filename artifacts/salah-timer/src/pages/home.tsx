@@ -373,9 +373,12 @@ export default function Home() {
   const [adhanEnabled, setAdhanEnabled] = useState(true);
   const [adhanPlaying, setAdhanPlaying] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const audioRef       = useRef<HTMLAudioElement | null>(null);
+  const audioRef         = useRef<HTMLAudioElement | null>(null);
   const audioUnlockedRef = useRef(false);
-  const playedRef      = useRef<Set<string>>(new Set());
+  const playedRef        = useRef<Set<string>>(new Set());
+  /* Debug time offset — lets user jump clock to verify prayer times */
+  const [timeOffsetMins, setTimeOffsetMins] = useState(0);
+  const timeOffsetMinsRef = useRef(0);
 
   const ADHAN_SOURCES = [
     "https://www.islamcan.com/audio/adhan/azan1.mp3",
@@ -467,10 +470,41 @@ export default function Home() {
     retry: 2,
   });
 
+  /* Keep offset ref in sync so the tick closure always reads the latest value */
+  useEffect(() => { timeOffsetMinsRef.current = timeOffsetMins; }, [timeOffsetMins]);
+
+  /* Apply a minute offset to a city time object (for debug time-skip) */
+  function applyOffset(ct: { h: number; m: number; s: number; display: string }, offsetMins: number) {
+    if (offsetMins === 0) return ct;
+    const total = ((ct.h * 60 + ct.m + offsetMins) % (24 * 60) + 24 * 60) % (24 * 60);
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    const s = ct.s;
+    const display = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return { h, m, s, display };
+  }
+
+  const handleSkipToPrayer = useCallback(() => {
+    if (!nextPrayer) return;
+    /* Jump to exactly the prayer minute so adhan fires within ≤20 s */
+    const jump = nextPrayer.remainingMinutes;
+    const newOffset = timeOffsetMinsRef.current + jump;
+    timeOffsetMinsRef.current = newOffset;
+    setTimeOffsetMins(newOffset);
+    playedRef.current.clear(); // allow adhan to fire after the jump
+  }, [nextPrayer]);
+
+  const handleResetTime = useCallback(() => {
+    timeOffsetMinsRef.current = 0;
+    setTimeOffsetMins(0);
+    playedRef.current.clear();
+  }, []);
+
   /* Live city clock + adhan trigger */
   useEffect(() => {
     const tick = () => {
-      const ct = getCityTime(selectedCity.timezone);
+      const rawCt = getCityTime(selectedCity.timezone);
+      const ct = applyOffset(rawCt, timeOffsetMinsRef.current);
       setCityTime(ct);
 
       /* Auto-refresh when city's local date changes (handles midnight correctly) */
@@ -721,6 +755,48 @@ export default function Home() {
           >
             {selectedCity.label} Local Time
           </p>
+
+          {/* Debug controls — jump clock to next prayer time */}
+          <div className="flex justify-center items-center gap-2 mt-3">
+            {nextPrayer && data?.timings && (
+              <button
+                onClick={handleSkipToPrayer}
+                style={{
+                  fontFamily: "Cinzel, serif",
+                  fontSize: "9px",
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
+                  color: "hsl(43 70% 55%)",
+                  background: "none",
+                  border: "1px solid hsl(43 40% 30%)",
+                  padding: "3px 10px",
+                  cursor: "pointer",
+                  borderRadius: 2,
+                }}
+              >
+                ⏩ Skip to {nextPrayer.name}
+              </button>
+            )}
+            {timeOffsetMins !== 0 && (
+              <button
+                onClick={handleResetTime}
+                style={{
+                  fontFamily: "Cinzel, serif",
+                  fontSize: "9px",
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
+                  color: "hsl(0 55% 55%)",
+                  background: "none",
+                  border: "1px solid hsl(0 30% 30%)",
+                  padding: "3px 10px",
+                  cursor: "pointer",
+                  borderRadius: 2,
+                }}
+              >
+                ✕ Reset Time
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── City Selector ────────────────────────────────────────── */}
