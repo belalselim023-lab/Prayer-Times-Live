@@ -47,14 +47,15 @@ interface City {
   timezone: string;
   lat: number;
   lng: number;
+  method: number; // AlAdhan calculation method
 }
 
 const CITIES: City[] = [
-  { id: "cairo",    label: "Cairo",     country: "Egypt",        flag: "🇪🇬", apiCity: "Cairo",     apiCountry: "Egypt",        timezone: "Africa/Cairo",    lat: 30.0444, lng: 31.2357  },
-  { id: "toronto",  label: "Toronto",   country: "Canada",       flag: "🇨🇦", apiCity: "Toronto",   apiCountry: "Canada",       timezone: "America/Toronto", lat: 43.6532, lng: -79.3832 },
-  { id: "moscow",   label: "Moscow",    country: "Russia",       flag: "🇷🇺", apiCity: "Moscow",    apiCountry: "Russia",       timezone: "Europe/Moscow",   lat: 55.7558, lng: 37.6173  },
-  { id: "mecca",    label: "Mecca",     country: "Saudi Arabia", flag: "🇸🇦", apiCity: "Mecca",     apiCountry: "Saudi Arabia", timezone: "Asia/Riyadh",     lat: 21.3891, lng: 39.8579  },
-  { id: "jerusalem",label: "Jerusalem", country: "Palestine",    flag: "🇵🇸", apiCity: "Jerusalem", apiCountry: "Palestine",    timezone: "Asia/Jerusalem",  lat: 31.7683, lng: 35.2137  },
+  { id: "cairo",     label: "Cairo",     country: "Egypt",        flag: "🇪🇬", apiCity: "Cairo",     apiCountry: "Egypt",        timezone: "Africa/Cairo",    lat: 30.0444, lng: 31.2357,  method: 5  }, // Egyptian General Authority of Survey
+  { id: "toronto",   label: "Toronto",   country: "Canada",       flag: "🇨🇦", apiCity: "Toronto",   apiCountry: "Canada",       timezone: "America/Toronto", lat: 43.6532, lng: -79.3832, method: 2  }, // ISNA (standard for North America)
+  { id: "moscow",    label: "Moscow",    country: "Russia",       flag: "🇷🇺", apiCity: "Moscow",    apiCountry: "Russia",       timezone: "Europe/Moscow",   lat: 55.7558, lng: 37.6173,  method: 3  }, // Muslim World League
+  { id: "mecca",     label: "Mecca",     country: "Saudi Arabia", flag: "🇸🇦", apiCity: "Mecca",     apiCountry: "Saudi Arabia", timezone: "Asia/Riyadh",     lat: 21.3891, lng: 39.8579,  method: 4  }, // Umm Al-Qura University, Mecca
+  { id: "jerusalem", label: "Jerusalem", country: "Palestine",    flag: "🇵🇸", apiCity: "Jerusalem", apiCountry: "Palestine",    timezone: "Asia/Jerusalem",  lat: 31.7683, lng: 35.2137,  method: 3  }, // Muslim World League
 ];
 
 const PRAYERS = [
@@ -81,12 +82,22 @@ function computeQibla(lat: number, lng: number): number {
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
-function getDateString(): string {
+/* Returns DD-MM-YYYY in the given city's timezone (not browser timezone) */
+function getCityDateString(timezone: string): string {
   const now = new Date();
-  const d = String(now.getDate()).padStart(2, "0");
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const y = now.getFullYear();
-  return `${d}-${m}-${y}`;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    day:   "2-digit",
+    month: "2-digit",
+    year:  "numeric",
+  }).formatToParts(now);
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? "00";
+  return `${get("day")}-${get("month")}-${get("year")}`;
+}
+
+/* Keep a timezone-agnostic version for midnight-refresh comparison */
+function getDateString(): string {
+  return getCityDateString(Intl.DateTimeFormat().resolvedOptions().timeZone);
 }
 
 function getCityTime(timezone: string): { h: number; m: number; s: number; display: string } {
@@ -427,13 +438,13 @@ export default function Home() {
     setAdhanPlaying(false);
   }, []);
 
-  const [dateStr, setDateStr] = useState(getDateString);
+  const [dateStr, setDateStr] = useState(() => getCityDateString(selectedCity.timezone));
 
   /* Prayer times */
   const { data, isLoading, error } = useQuery<TimingsData>({
     queryKey: ["prayerTimes", selectedCity.id, dateStr],
     queryFn: async () => {
-      const url = `https://api.aladhan.com/v1/timingsByCity/${dateStr}?city=${encodeURIComponent(selectedCity.apiCity)}&country=${encodeURIComponent(selectedCity.apiCountry)}&method=2`;
+      const url = `https://api.aladhan.com/v1/timingsByCity/${dateStr}?city=${encodeURIComponent(selectedCity.apiCity)}&country=${encodeURIComponent(selectedCity.apiCountry)}&method=${selectedCity.method}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch prayer times");
       const json = await res.json();
@@ -462,8 +473,8 @@ export default function Home() {
       const ct = getCityTime(selectedCity.timezone);
       setCityTime(ct);
 
-      /* Auto-refresh prayer times at midnight */
-      const today = getDateString();
+      /* Auto-refresh when city's local date changes (handles midnight correctly) */
+      const today = getCityDateString(selectedCity.timezone);
       setDateStr(prev => prev !== today ? today : prev);
       if (data?.timings) {
         const np = getNextPrayer(data.timings, ct.h, ct.m);
