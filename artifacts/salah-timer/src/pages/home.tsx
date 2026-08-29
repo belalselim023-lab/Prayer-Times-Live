@@ -50,6 +50,22 @@ interface City {
   method: number; // AlAdhan calculation method
 }
 
+interface GeocodingResult {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  timezone?: string;
+  country?: string;
+  country_code?: string;
+  admin1?: string;
+  feature_code?: string;
+}
+
+interface GeocodingResponse {
+  results?: GeocodingResult[];
+}
+
 const CITIES: City[] = [
   { id: "cairo",     label: "Cairo",     country: "Egypt",        flag: "🇪🇬", apiCity: "Cairo",     apiCountry: "Egypt",        timezone: "Africa/Cairo",    lat: 30.0444, lng: 31.2357,  method: 5  }, // Egyptian General Authority of Survey
   { id: "toronto",   label: "Toronto",   country: "Canada",       flag: "🇨🇦", apiCity: "Toronto",   apiCountry: "Canada",       timezone: "America/Toronto", lat: 43.6532, lng: -79.3832, method: 2  }, // ISNA (standard for North America)
@@ -57,6 +73,25 @@ const CITIES: City[] = [
   { id: "mecca",     label: "Mecca",     country: "Saudi Arabia", flag: "🇸🇦", apiCity: "Mecca",     apiCountry: "Saudi Arabia", timezone: "Asia/Riyadh",     lat: 21.3891, lng: 39.8579,  method: 4  }, // Umm Al-Qura University, Mecca
   { id: "jerusalem", label: "Jerusalem", country: "Palestine",    flag: "🇵🇸", apiCity: "Jerusalem", apiCountry: "Palestine",    timezone: "Asia/Jerusalem",  lat: 31.7683, lng: 35.2137,  method: 3  }, // Muslim World League
 ];
+
+const CALCULATION_METHOD_NAMES: Record<number, string> = {
+  0: "Shia Ithna-Ashari",
+  1: "University of Islamic Sciences, Karachi",
+  2: "ISNA",
+  3: "Muslim World League",
+  4: "Umm Al-Qura University",
+  5: "Egyptian General Authority of Survey",
+  7: "Institute of Geophysics, University of Tehran",
+  8: "Gulf Region",
+  9: "Kuwait",
+  10: "Qatar",
+  11: "Singapore",
+  12: "France",
+  13: "Turkey",
+  14: "Russia",
+  15: "Moonsighting Committee",
+  16: "Dubai",
+};
 
 const PRAYERS = [
   { key: "Fajr",    label: "Fajr",    arabic: "الفجر",  desc: "Pre-Dawn"  },
@@ -368,6 +403,11 @@ function QiblaCompass({ bearing, isLoading }: { bearing: number | undefined; isL
 /* ── Main Page ──────────────────────────────────────────────────────── */
 export default function Home() {
   const [selectedCity, setSelectedCity] = useState<City>(CITIES[0]);
+  const [citySearch, setCitySearch] = useState("");
+  const [debouncedCitySearch, setDebouncedCitySearch] = useState("");
+  const [showCityResults, setShowCityResults] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
   const [cityTime, setCityTime] = useState({ h: 0, m: 0, s: 0, display: "00:00:00" });
   const [nextPrayer, setNextPrayer] = useState<{ name: string; remainingMinutes: number } | null>(null);
   const [adhanEnabled, setAdhanEnabled] = useState(true);
@@ -450,11 +490,90 @@ export default function Home() {
 
   const [dateStr, setDateStr] = useState(() => getCityDateString(selectedCity.timezone));
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedCitySearch(citySearch.trim());
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [citySearch]);
+
+  const { data: citySearchData, isFetching: isSearchingCities } = useQuery<GeocodingResponse>({
+    queryKey: ["citySearch", debouncedCitySearch],
+    queryFn: async () => {
+      const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(debouncedCitySearch)}&count=8&language=en&format=json`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to search cities");
+      return res.json() as Promise<GeocodingResponse>;
+    },
+    enabled: debouncedCitySearch.length >= 2,
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
+  });
+
+  const cityFromGeocoding = useCallback((result: GeocodingResult, label = result.name): City => ({
+    id: `world-${result.id}-${result.latitude}-${result.longitude}`,
+    label,
+    country: result.country ?? "Worldwide",
+    flag: result.country_code?.toUpperCase() ?? "WORLD",
+    apiCity: result.name,
+    apiCountry: result.country ?? "",
+    timezone: result.timezone ?? "UTC",
+    lat: result.latitude,
+    lng: result.longitude,
+    /* A broadly used default for cities added through worldwide search. */
+    method: 3,
+  }), []);
+
+  const selectCity = useCallback((city: City) => {
+    setSelectedCity(city);
+    setDateStr(getCityDateString(city.timezone));
+    setTimeOffsetMins(0);
+    timeOffsetMinsRef.current = 0;
+    playedRef.current.clear();
+    setCitySearch("");
+    setShowCityResults(false);
+    setLocationError("");
+  }, []);
+
+  const useMyLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationError("Location is not available in this browser.");
+      return;
+    }
+    setIsLocating(true);
+    setLocationError("");
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        selectCity({
+          id: `my-location-${Math.round(coords.latitude * 10000)}-${Math.round(coords.longitude * 10000)}`,
+          label: "My Location",
+          country: "GPS coordinates",
+          flag: "GPS",
+          apiCity: "Current Location",
+          apiCountry: "World",
+          timezone,
+          lat: coords.latitude,
+          lng: coords.longitude,
+          method: 3,
+        });
+        setIsLocating(false);
+      },
+      () => {
+        setIsLocating(false);
+        setLocationError("Location permission was not granted. Search for a city instead.");
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    );
+  }, [selectCity]);
+
   /* Prayer times */
   const { data, isLoading, error } = useQuery<TimingsData>({
     queryKey: ["prayerTimes", selectedCity.id, dateStr],
     queryFn: async () => {
-      const url = `https://api.aladhan.com/v1/timingsByCity/${dateStr}?city=${encodeURIComponent(selectedCity.apiCity)}&country=${encodeURIComponent(selectedCity.apiCountry)}&method=${selectedCity.method}`;
+      /* Coordinates make the AlAdhan request reliable for every city worldwide,
+         including places with duplicate names or no exact city match. */
+      const url = `https://api.aladhan.com/v1/timings/${dateStr}?latitude=${selectedCity.lat}&longitude=${selectedCity.lng}&method=${selectedCity.method}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch prayer times");
       const json = await res.json();
@@ -530,7 +649,7 @@ export default function Home() {
             if (!raw) continue;
             const [ph, pm] = raw.split(":").map(Number);
             if (nowMins === ph * 60 + pm) {
-              const key = `${selectedCity.id}-${prayerKey}-${getDateString()}`;
+              const key = `${selectedCity.id}-${prayerKey}-${getCityDateString(selectedCity.timezone)}`;
               if (!playedRef.current.has(key)) {
                 playedRef.current.add(key);
                 playAdhan();
@@ -834,13 +953,122 @@ export default function Home() {
         {/* ── City Selector ────────────────────────────────────────── */}
         <div className="mb-8">
           <ArtDecoDivider label="Select City" />
-          <div className="flex flex-wrap justify-center gap-2 mt-4">
+          <div className="max-w-2xl mx-auto mt-4">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="search"
+                  value={citySearch}
+                  onChange={(event) => {
+                    setCitySearch(event.target.value);
+                    setShowCityResults(true);
+                  }}
+                  onFocus={() => setShowCityResults(true)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && citySearchData?.results?.[0]) {
+                      selectCity(cityFromGeocoding(citySearchData.results[0]));
+                    }
+                    if (event.key === "Escape") setShowCityResults(false);
+                  }}
+                  placeholder="Search any city in the world..."
+                  aria-label="Search for a city worldwide"
+                  aria-expanded={showCityResults}
+                  className="w-full px-4 py-3 border bg-transparent outline-none"
+                  style={{
+                    color: "hsl(43 55% 88%)",
+                    borderColor: "hsl(43 35% 22%)",
+                    fontFamily: "Cormorant Garamond, serif",
+                    fontSize: "17px",
+                    letterSpacing: "0.04em",
+                  }}
+                />
+                {showCityResults && citySearch.trim().length >= 2 && (
+                  <div
+                    className="absolute left-0 right-0 top-full z-20 mt-1 border"
+                    role="listbox"
+                    style={{
+                      background: "hsl(230 30% 9%)",
+                      borderColor: "hsl(43 35% 30%)",
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+                    }}
+                  >
+                    {isSearchingCities && (
+                      <p
+                        className="px-4 py-3 text-xs uppercase tracking-widest"
+                        style={{ color: "hsl(43 35% 55%)", fontFamily: "Cinzel, serif" }}
+                      >
+                        Searching the world...
+                      </p>
+                    )}
+                    {!isSearchingCities && citySearchData?.results?.length === 0 && (
+                      <p
+                        className="px-4 py-3 text-sm"
+                        style={{ color: "hsl(43 25% 55%)", fontFamily: "Cormorant Garamond, serif" }}
+                      >
+                        No matching city found. Try a nearby larger city.
+                      </p>
+                    )}
+                    {!isSearchingCities && citySearchData?.results?.map((result) => {
+                      const city = cityFromGeocoding(result);
+                      return (
+                        <button
+                          key={city.id}
+                          type="button"
+                          role="option"
+                          onClick={() => selectCity(city)}
+                          className="w-full text-left px-4 py-3 transition-colors hover:bg-[hsl(43_30%_16%)]"
+                          style={{ fontFamily: "Cormorant Garamond, serif", color: "hsl(43 60% 82%)" }}
+                        >
+                          <span className="block text-base tracking-wide">
+                            {result.name}, {result.country_code?.toUpperCase() ?? result.country}
+                          </span>
+                          <span className="block text-xs mt-0.5" style={{ color: "hsl(43 25% 50%)" }}>
+                            {[result.admin1, result.timezone].filter(Boolean).join(" · ")}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={useMyLocation}
+                disabled={isLocating}
+                className="px-4 py-3 border transition-colors hover:bg-[hsl(43_30%_16%)] disabled:opacity-60"
+                style={{
+                  color: "hsl(43 70% 62%)",
+                  borderColor: "hsl(43 35% 30%)",
+                  background: "transparent",
+                  fontFamily: "Cinzel, serif",
+                  fontSize: "10px",
+                  letterSpacing: "0.15em",
+                  textTransform: "uppercase",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {isLocating ? "Finding Location..." : "Use My Location"}
+              </button>
+            </div>
+            <p
+              className="text-center mt-2 text-xs"
+              style={{ color: "hsl(43 20% 42%)", fontFamily: "Cormorant Garamond, serif", letterSpacing: "0.04em" }}
+            >
+              Search by city and country, or use your device location for the most accurate local times.
+            </p>
+            {locationError && (
+              <p className="text-center mt-2 text-xs" style={{ color: "hsl(0 65% 60%)", fontFamily: "Cormorant Garamond, serif" }}>
+                {locationError}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap justify-center gap-2 mt-5">
             {CITIES.map((city) => {
               const isActive = selectedCity.id === city.id;
               return (
                 <button
                   key={city.id}
-                  onClick={() => setSelectedCity(city)}
+                  onClick={() => selectCity(city)}
                   className={`relative px-4 py-2.5 border text-xs tracking-[0.2em] uppercase transition-all duration-200 cursor-pointer ${
                     isActive ? "city-btn-active" : "city-btn-inactive"
                   }`}
@@ -1006,7 +1234,7 @@ export default function Home() {
               className="text-center mt-6 text-xs tracking-widest uppercase"
               style={{ color: "hsl(43 20% 38%)", fontFamily: "Cinzel, serif" }}
             >
-              Method: ISNA &mdash; {data.meta?.timezone}
+               Method: {CALCULATION_METHOD_NAMES[selectedCity.method] ?? "Muslim World League"} &mdash; {data.meta?.timezone ?? selectedCity.timezone}
             </p>
           </>
         )}
